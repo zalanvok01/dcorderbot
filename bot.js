@@ -161,24 +161,32 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isModalSubmit()) {
       const [action, orderId] = interaction.customId.split('_');
 
-      if (action === 'feedback') {
-        const feedback = interaction.fields.getTextInputValue('feedback_text');
-        const orderData = orders[orderId];
+ if (action === 'feedback') {
+  const feedback = interaction.fields.getTextInputValue('feedback_text');
+  const orderData = orders[orderId];
 
-        const owner = await client.users.fetch(OWNER_ID);
-        const feedbackEmbed = new EmbedBuilder()
-          .setColor('#00ff00')
-          .setTitle('📝 Order Feedback Received')
-          .addFields(
-            { name: 'Order ID', value: orderId },
-            { name: 'Claimed by', value: `<@${interaction.user.id}>` },
-            { name: 'Feedback', value: feedback }
-          )
-          .setTimestamp();
+  // Find the channel named "order-take-notify"
+  const guild = interaction.guild;
+  const notifyChannel = guild.channels.cache.find(ch => ch.name === 'order-take-notify' && ch.isTextBased());
 
-        await owner.send({ embeds: [feedbackEmbed] });
-        await interaction.reply({ content: '✅ Feedback submitted! Thank you!', ephemeral: true });
-      }
+  if (!notifyChannel) {
+    return interaction.reply({ content: '❌ Notification channel not found!', ephemeral: true });
+  }
+
+  const feedbackEmbed = new EmbedBuilder()
+    .setColor('#00ff00')
+    .setTitle('📝 Order Feedback Received')
+    .addFields(
+      { name: 'Order ID', value: orderId },
+      { name: 'Claimed by', value: `<@${interaction.user.id}>` },
+      { name: 'Feedback', value: feedback }
+    )
+    .setTimestamp();
+
+  await notifyChannel.send({ embeds: [feedbackEmbed] });
+  await interaction.reply({ content: '✅ Feedback submitted! Thank you!', ephemeral: true });
+}
+
     }
   } catch (error) {
     console.error(error);
@@ -189,5 +197,6 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
 
 
