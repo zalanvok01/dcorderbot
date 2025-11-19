@@ -1,25 +1,35 @@
 const { Client, GatewayIntentBits, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
-const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
 const OWNER_ID = process.env.OWNER_ID;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/discord-bot';
+const ordersFile = path.join(__dirname, 'orders.json');
 
-// MongoDB Schema
-const orderSchema = new mongoose.Schema({
-  orderId: String,
-  claimed: Boolean,
-  claimedBy: String,
-  messageId: String,
-  channelId: String,
-  orderName: String,
-  amount: Number,
-  createdAt: { type: Date, default: Date.now }
-});
+// Load orders from file
+function loadOrders() {
+  try {
+    if (fs.existsSync(ordersFile)) {
+      return JSON.parse(fs.readFileSync(ordersFile, 'utf8'));
+    }
+  } catch (err) {
+    console.error('Error loading orders:', err);
+  }
+  return {};
+}
 
-const Order = mongoose.model('Order', orderSchema);
+// Save orders to file
+function saveOrders(orders) {
+  try {
+    fs.writeFileSync(ordersFile, JSON.stringify(orders, null, 2));
+  } catch (err) {
+    console.error('Error saving orders:', err);
+  }
+}
+
+let orders = loadOrders();
 
 client.once('ready', () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
@@ -70,8 +80,8 @@ client.on('interactionCreate', async interaction => {
 
         const message = await channel.send({ embeds: [embed], components: [row] });
         
-        // Save to MongoDB
-        await Order.create({
+        // Save to file
+        orders[orderId] = {
           orderId,
           claimed: false,
           claimedBy: null,
@@ -79,7 +89,8 @@ client.on('interactionCreate', async interaction => {
           channelId: channel.id,
           orderName,
           amount
-        });
+        };
+        saveOrders(orders);
 
         await interaction.reply({ content: `✅ Order created in ${channel}!`, ephemeral: true });
       }
@@ -89,7 +100,7 @@ client.on('interactionCreate', async interaction => {
       const [action, orderId] = interaction.customId.split('_');
       
       if (action === 'claim') {
-        const orderData = await Order.findOne({ orderId });
+        const orderData = orders[orderId];
 
         if (!orderData) {
           return interaction.reply({ content: '❌ Order not found!', ephemeral: true });
@@ -99,10 +110,9 @@ client.on('interactionCreate', async interaction => {
           return interaction.reply({ content: `❌ This order was already claimed by <@${orderData.claimedBy}>!`, ephemeral: true });
         }
 
-        // Update in MongoDB
         orderData.claimed = true;
         orderData.claimedBy = interaction.user.id;
-        await orderData.save();
+        saveOrders(orders);
 
         const channel = client.channels.cache.get(orderData.channelId);
         const message = await channel.messages.fetch(orderData.messageId);
@@ -143,7 +153,7 @@ client.on('interactionCreate', async interaction => {
 
       if (action === 'feedback') {
         const feedback = interaction.fields.getTextInputValue('feedback_text');
-        const orderData = await Order.findOne({ orderId });
+        const orderData = orders[orderId];
 
         const owner = await client.users.fetch(OWNER_ID);
         const feedbackEmbed = new EmbedBuilder()
@@ -168,10 +178,4 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Connect to MongoDB
-mongoose.connect(MONGODB_URI).then(() => {
-  console.log('✅ Connected to MongoDB');
-  client.login(process.env.DISCORD_TOKEN);
-}).catch(err => {
-  console.error('❌ MongoDB connection error:', err);
-});
+client.login(process.env.DISCORD_TOKEN);
