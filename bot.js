@@ -1,10 +1,25 @@
 const { Client, GatewayIntentBits, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const mongoose = require('mongoose');
 require('dotenv').config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
 const OWNER_ID = process.env.OWNER_ID;
-const claimedOrders = new Map();
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/discord-bot';
+
+// MongoDB Schema
+const orderSchema = new mongoose.Schema({
+  orderId: String,
+  claimed: Boolean,
+  claimedBy: String,
+  messageId: String,
+  channelId: String,
+  orderName: String,
+  amount: Number,
+  createdAt: { type: Date, default: Date.now }
+});
+
+const Order = mongoose.model('Order', orderSchema);
 
 client.once('ready', () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
@@ -54,7 +69,17 @@ client.on('interactionCreate', async interaction => {
           );
 
         const message = await channel.send({ embeds: [embed], components: [row] });
-        claimedOrders.set(orderId, { claimed: false, claimedBy: null, messageId: message.id, channelId: channel.id });
+        
+        // Save to MongoDB
+        await Order.create({
+          orderId,
+          claimed: false,
+          claimedBy: null,
+          messageId: message.id,
+          channelId: channel.id,
+          orderName,
+          amount
+        });
 
         await interaction.reply({ content: `✅ Order created in ${channel}!`, ephemeral: true });
       }
@@ -64,7 +89,7 @@ client.on('interactionCreate', async interaction => {
       const [action, orderId] = interaction.customId.split('_');
       
       if (action === 'claim') {
-        const orderData = claimedOrders.get(orderId);
+        const orderData = await Order.findOne({ orderId });
 
         if (!orderData) {
           return interaction.reply({ content: '❌ Order not found!', ephemeral: true });
@@ -74,8 +99,10 @@ client.on('interactionCreate', async interaction => {
           return interaction.reply({ content: `❌ This order was already claimed by <@${orderData.claimedBy}>!`, ephemeral: true });
         }
 
+        // Update in MongoDB
         orderData.claimed = true;
         orderData.claimedBy = interaction.user.id;
+        await orderData.save();
 
         const channel = client.channels.cache.get(orderData.channelId);
         const message = await channel.messages.fetch(orderData.messageId);
@@ -116,7 +143,7 @@ client.on('interactionCreate', async interaction => {
 
       if (action === 'feedback') {
         const feedback = interaction.fields.getTextInputValue('feedback_text');
-        const orderData = claimedOrders.get(orderId);
+        const orderData = await Order.findOne({ orderId });
 
         const owner = await client.users.fetch(OWNER_ID);
         const feedbackEmbed = new EmbedBuilder()
@@ -141,4 +168,10 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+// Connect to MongoDB
+mongoose.connect(MONGODB_URI).then(() => {
+  console.log('✅ Connected to MongoDB');
+  client.login(process.env.DISCORD_TOKEN);
+}).catch(err => {
+  console.error('❌ MongoDB connection error:', err);
+});
