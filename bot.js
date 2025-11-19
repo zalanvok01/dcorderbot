@@ -14,7 +14,6 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-
 // Load orders from file
 function loadOrders() {
   try {
@@ -169,20 +168,4 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-
-    }
-  } catch (error) {
-    console.error(error);
-    if (!interaction.replied) {
-      interaction.reply({ content: '❌ An error occurred!', ephemeral: true });
-    }
-  }
-});
-
 client.login(process.env.DISCORD_TOKEN);
-
-
-
-
-
-
