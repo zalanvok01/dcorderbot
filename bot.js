@@ -104,7 +104,10 @@ client.on('interactionCreate', async interaction => {
     }
 
     if (interaction.isButton()) {
-      const [action, orderId] = interaction.customId.split('_');
+  const parts = interaction.customId.split('_');
+  const action = parts[0];
+  const orderId = parts.slice(1).join('_');
+
       
       if (action === 'claim') {
         const orderData = orders[orderId];
@@ -186,4 +189,5 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
 
