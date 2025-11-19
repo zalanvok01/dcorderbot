@@ -87,7 +87,6 @@ client.on('interactionCreate', async interaction => {
 
         const message = await channel.send({ embeds: [embed], components: [row] });
         
-        // Save to file
         orders[orderId] = {
           orderId,
           claimed: false,
@@ -104,92 +103,72 @@ client.on('interactionCreate', async interaction => {
     }
 
     if (interaction.isButton()) {
-  const parts = interaction.customId.split('_');
-  const action = parts[0];
-  const orderId = parts.slice(1).join('_');
-
+      const parts = interaction.customId.split('_');
+      const action = parts[0];
+      const orderId = parts.slice(1).join('_');
       
-  if (action === 'claim') {
-  const orderData = orders[orderId];
+      if (action === 'claim') {
+        const orderData = orders[orderId];
 
-  if (!orderData) {
-    return interaction.reply({ content: '❌ Order not found!', ephemeral: true });
-  }
+        if (!orderData) {
+          return interaction.reply({ content: '❌ Order not found!', ephemeral: true });
+        }
 
-  if (orderData.claimed) {
-    return interaction.reply({ content: `❌ This order was already claimed by <@${orderData.claimedBy}>!`, ephemeral: true });
-  }
+        if (orderData.claimed) {
+          return interaction.reply({ content: `❌ This order was already claimed by <@${orderData.claimedBy}>!`, ephemeral: true });
+        }
 
-  orderData.claimed = true;
-  orderData.claimedBy = interaction.user.id;
-  saveOrders(orders);
+        orderData.claimed = true;
+        orderData.claimedBy = interaction.user.id;
+        saveOrders(orders);
 
-  const channel = client.channels.cache.get(orderData.channelId);
-  const message = await channel.messages.fetch(orderData.messageId);
-  
-  const updatedEmbed = EmbedBuilder.from(message.embeds[0])
-    .spliceFields(2, 1, { name: 'Status', value: `✅ Claimed by <@${interaction.user.id}>`, inline: true });
+        const channel = client.channels.cache.get(orderData.channelId);
+        const message = await channel.messages.fetch(orderData.messageId);
+        
+        const updatedEmbed = EmbedBuilder.from(message.embeds[0])
+          .spliceFields(2, 1, { name: 'Status', value: `✅ Claimed by <@${interaction.user.id}>`, inline: true });
 
-  const disabledRow = new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId(`claim_${orderId}`)
-        .setLabel('Claim Order')
-        .setStyle(ButtonStyle.Success)
-        .setDisabled(true)
-    );
+        const disabledRow = new ActionRowBuilder()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId(`claim_${orderId}`)
+              .setLabel('Claim Order')
+              .setStyle(ButtonStyle.Success)
+              .setDisabled(true)
+          );
 
-  await message.edit({ embeds: [updatedEmbed], components: [disabledRow] });
+        await message.edit({ embeds: [updatedEmbed], components: [disabledRow] });
 
-  // Send notification to order-take-notify channel
-  const guild = interaction.guild;
-  const notifyChannel = guild.channels.cache.find(ch => ch.name === 'order-take-notify' && ch.isTextBased());
+        // Send notification to order-take-notify channel
+        const guild = interaction.guild;
+        const notifyChannel = guild.channels.cache.find(ch => ch.name === 'order-take-notify' && ch.isTextBased());
 
-  if (notifyChannel) {
-    const claimEmbed = new EmbedBuilder()
-      .setColor('#00ff00')
-      .setTitle('✅ Order Claimed')
-      .addFields(
-        { name: 'Order ID', value: orderId },
-        { name: 'Order Name', value: orderData.orderName },
-        { name: 'Amount', value: `${orderData.amount}` },
-        { name: 'Claimed by', value: `<@${interaction.user.id}>` }
-      )
-      .setTimestamp();
+        if (notifyChannel) {
+          const claimEmbed = new EmbedBuilder()
+            .setColor('#00ff00')
+            .setTitle('✅ Order Claimed')
+            .addFields(
+              { name: 'Order ID', value: orderId },
+              { name: 'Order Name', value: orderData.orderName },
+              { name: 'Amount', value: `${orderData.amount}` },
+              { name: 'Claimed by', value: `<@${interaction.user.id}>` }
+            )
+            .setTimestamp();
 
-    await notifyChannel.send({ embeds: [claimEmbed] });
-  }
+          await notifyChannel.send({ embeds: [claimEmbed] });
+        }
 
-  await interaction.reply({ content: '✅ Order claimed! Notification sent.', ephemeral: true });
-}
-
+        await interaction.reply({ content: '✅ Order claimed! Notification sent.', ephemeral: true });
+      }
     }
-
-
-  const feedback = interaction.fields.getTextInputValue('feedback_text');
-  const orderData = orders[orderId];
-
-  // Find the channel named "order-take-notify"
-  const guild = interaction.guild;
-  const notifyChannel = guild.channels.cache.find(ch => ch.name === 'order-take-notify' && ch.isTextBased());
-
-  if (!notifyChannel) {
-    return interaction.reply({ content: '❌ Notification channel not found!', ephemeral: true });
+  } catch (error) {
+    console.error(error);
+    if (!interaction.replied) {
+      interaction.reply({ content: '❌ An error occurred!', ephemeral: true });
+    }
   }
+});
 
-  const feedbackEmbed = new EmbedBuilder()
-    .setColor('#00ff00')
-    .setTitle('📝 Order Feedback Received')
-    .addFields(
-      { name: 'Order ID', value: orderId },
-      { name: 'Claimed by', value: `<@${interaction.user.id}>` },
-      { name: 'Feedback', value: feedback }
-    )
-    .setTimestamp();
-
-  await notifyChannel.send({ embeds: [feedbackEmbed] });
-  await interaction.reply({ content: '✅ Feedback submitted! Thank you!', ephemeral: true });
-}
 
     }
   } catch (error) {
@@ -201,6 +180,7 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
 
 
 
