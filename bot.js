@@ -165,10 +165,7 @@ client.on('interactionCreate', async interaction => {
 
     }
 
-    if (interaction.isModalSubmit()) {
-      const [action, orderId] = interaction.customId.split('_');
 
- if (action === 'feedback') {
   const feedback = interaction.fields.getTextInputValue('feedback_text');
   const orderData = orders[orderId];
 
@@ -204,6 +201,7 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
 
 
 
