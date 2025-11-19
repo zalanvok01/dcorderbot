@@ -6,7 +6,14 @@ require('dotenv').config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
 const OWNER_ID = process.env.OWNER_ID;
-const ordersFile = path.join(__dirname, 'orders.json');
+const ordersFile = path.join('/app/data', 'orders.json');
+
+// Create data directory if it doesn't exist
+const dataDir = '/app/data';
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
 
 // Load orders from file
 function loadOrders() {
@@ -179,3 +186,4 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
